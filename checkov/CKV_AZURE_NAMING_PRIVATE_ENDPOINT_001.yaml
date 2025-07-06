@@ -1,0 +1,14 @@
+# checkov/CKV_AZURE_NAMING_PEP_001.yaml
+metadata:
+  id: CKV_AZURE_NAMING_PEP_001
+  name: "Private Endpoint names must start with 'pep'"
+  category: "NAMING_CONVENTION"
+  severity: "LOW"
+
+definition:
+  cond_type: attribute
+  resource_types:
+    - azurerm_private_endpoint
+  attribute: "name | change.after.name"
+  operator: regex_match
+  value: '^pep-[A-Za-z0-9-]*$'

@@ -1,0 +1,26 @@
+# checkov/CKV_AZURE_NAMING_RG_001.yaml
+metadata:
+  id: CKV_AZURE_NAMING_RG_001
+  name: "RG names must follow company pattern"
+  category: "NAMING_CONVENTION"
+  severity: "LOW"
+  description: |
+    Required format:
+      rg-<workload>-<region>-<env>-NN
+
+      • workload – letters or digits (no dashes)
+      • region   – one of: uks, ukw, euw, frc, gwc
+      • env      – one of: poc, mvp, dev, qa, uat, ppd, prd
+      • NN       – two-digit sequence (00–99)
+
+    Examples:
+      rg-app-uks-dev-00
+      rg-db-euw-prd-03
+
+definition:
+  cond_type: attribute
+  resource_types:
+    - azurerm_resource_group
+  attribute: name
+  operator: regex_match
+  value: '^rg-[A-Za-z0-9]+-(uks|ukw|euw|frc|gwc)-(poc|mvp|dev|qa|uat|ppd|prd)-[0-9]{2}$'

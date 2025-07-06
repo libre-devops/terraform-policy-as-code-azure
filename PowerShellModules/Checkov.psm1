@@ -133,7 +133,142 @@ function Invoke-Checkov
     }
 }
 
+function Invoke-CheckovSource {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $CodePath,
+
+        [string] $ExternalChecksDir = 'checkov',
+
+        [string] $CheckovSkipChecks = '',
+
+        [switch] $SoftFail,
+
+        [string[]] $ExtraArgs = @()
+    )
+
+    $inv = $MyInvocation.MyCommand.Name
+
+    # ── validate paths ──────────────────────────────────────────────
+    $resolvedCode = Resolve-Path -Path $CodePath -ErrorAction Stop
+    if (-not (Test-Path $resolvedCode)) {
+        _LogMessage -Level ERROR -Message "CodePath not found: $resolvedCode" -InvocationName $inv
+        throw "CodePath not found: $resolvedCode"
+    }
+
+    $resolvedPolicies = Resolve-Path -Path $ExternalChecksDir -ErrorAction Stop
+    if (-not (Test-Path $resolvedPolicies)) {
+        _LogMessage -Level ERROR -Message "ExternalChecksDir not found: $resolvedPolicies" -InvocationName $inv
+        throw "ExternalChecksDir not found: $resolvedPolicies"
+    }
+
+    # ── build --skip-check arg (if supplied) ───────────────────────
+    $skipArg = @()
+    if ($CheckovSkipChecks.Trim()) {
+        $ids = ($CheckovSkipChecks -split ',') |
+                ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        if ($ids) {
+            _LogMessage -Level DEBUG -Message "Skipping checks: $($ids -join ', ')" -InvocationName $inv
+            $skipArg = @('--skip-check', ($ids -join ','))
+        }
+    }
+
+    # ── assemble Checkov arguments ─────────────────────────────────
+    $checkovArgs = @(
+        '-d', $resolvedCode
+        '--external-checks-dir', $resolvedPolicies
+    ) + $skipArg + $ExtraArgs
+
+    if ($SoftFail) { $checkovArgs += '--soft-fail' }
+
+    _LogMessage -Level INFO -Message "Executing Checkov: checkov $($checkovArgs -join ' ')" -InvocationName $inv
+
+    & checkov @checkovArgs
+    $exit = $LASTEXITCODE
+
+    if ($exit -eq 0) {
+        _LogMessage -Level INFO -Message 'Checkov source scan succeeded.' -InvocationName $inv
+    } elseif ($SoftFail) {
+        _LogMessage -Level WARN -Message "Checkov source scan reported failures (exit $exit) — continuing due to -SoftFail." -InvocationName $inv
+    } else {
+        _LogMessage -Level ERROR -Message "Checkov source scan failed (exit $exit)." -InvocationName $inv
+        throw "Checkov source scan failed (exit $exit)."
+    }
+}
+
+function Invoke-CheckovFlexible {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,                         # file (.json) or directory (.tf)
+
+        [string] $ExternalChecksDir = 'checkov',
+
+        [string] $CheckovSkipChecks = '',
+
+        [switch] $SoftFail,
+
+        [string[]] $ExtraArgs = @()
+    )
+
+    $inv = $MyInvocation.MyCommand.Name
+    $resolvedPath = Resolve-Path -Path $Path -ErrorAction Stop
+
+    if (-not (Test-Path $resolvedPath)) {
+        _LogMessage -Level ERROR -Message "Path not found: $resolvedPath" -InvocationName $inv
+        throw "Path not found: $resolvedPath"
+    }
+
+    # build --skip-check argument
+    $skipArg = @()
+    if ($CheckovSkipChecks.Trim()) {
+        $ids = ($CheckovSkipChecks -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        if ($ids) { $skipArg = @('--skip-check', ($ids -join ',')) }
+    }
+
+    # detect plan vs source
+    $isPlan = (Test-Path $resolvedPath -PathType Leaf) -and $resolvedPath.ToString().ToLower().EndsWith('.json')
+
+    if ($isPlan) {
+        # -------- plan scan --------
+        $checkovArgs = @(
+            '--framework', 'terraform_plan'
+            '-f', $resolvedPath
+            '--external-checks-dir', $ExternalChecksDir
+            '--repo-root-for-plan-enrichment', (Split-Path $resolvedPath -Parent)  # enrich mod paths
+            '--download-external-modules', 'false'
+        )
+    } else {
+        # -------- source scan --------
+        $checkovArgs = @(
+            '-d', $resolvedPath
+            '--external-checks-dir', $ExternalChecksDir
+        )
+    }
+
+    $checkovArgs += $skipArg + $ExtraArgs
+    if ($SoftFail) { $checkovArgs += '--soft-fail' }
+
+    _LogMessage -Level INFO -Message "Executing Checkov: checkov $($checkovArgs -join ' ')" -InvocationName $inv
+
+    & checkov @checkovArgs
+    $exit = $LASTEXITCODE
+
+    if ($exit -eq 0) {
+        _LogMessage -Level INFO -Message 'Checkov completed with no failed checks.' -InvocationName $inv
+    } elseif ($SoftFail) {
+        _LogMessage -Level WARN -Message "Checkov reported failures (exit $exit) — continuing due to -SoftFail." -InvocationName $inv
+    } else {
+        _LogMessage -Level ERROR -Message "Checkov failed (exit $exit)." -InvocationName $inv
+        throw "Checkov failed (exit $exit)."
+    }
+}
+
+
 
 Export-ModuleMember -Function `
     Invoke-Checkov, `
-     Invoke-InstallCheckov
+    Invoke-InstallCheckov, `
+    Invoke-CheckovFlexible, `
+    Invoke-CheckovSource

@@ -1,0 +1,26 @@
+metadata:
+  id: CKV_AZURE_NAMING_STORAGE_ACCOUNT_001
+  name: "Storage-account names must start with 'st'"
+  category: "NAMING_CONVENTION"
+  severity: "LOW"
+  description: |
+    Required format:
+      st<suffix>
+
+      • overall length 3–24 characters
+      • lowercase letters and digits only
+      • must begin with st
+
+    Examples:
+      stappdata01
+      stlog002
+
+definition:
+  cond_type: attribute
+  resource_types:
+    - azurerm_storage_account
+
+  # works on either raw HCL (name) or plan JSON (change.after.name)
+  attribute: "name | change.after.name"
+  operator: regex_match
+  value: '^st[a-z0-9]{1,22}$'

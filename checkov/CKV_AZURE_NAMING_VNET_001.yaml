@@ -1,0 +1,13 @@
+metadata:
+  id: CKV_AZURE_NAMING_VNET_001
+  name: "VNet names must start with 'vnet-'"
+  category: "NAMING_CONVENTION"
+  severity: "LOW"
+
+definition:
+  cond_type: attribute
+  resource_types:
+    - azurerm_virtual_network
+  attribute: "name | change.after.name"
+  operator: regex_match
+  value: '^vnet-[A-Za-z0-9-]+$'

@@ -1,0 +1,21 @@
+metadata:
+  id: CKV_AZURE_LOCATIONS_001
+  name: "Resources must be deployed only to approved regions"
+  category: "APPROVED_REGION"
+  severity: "HIGH"
+  description: |
+    Every Azure resource that exposes a `location` attribute must be in one of:
+      • uksouth          • ukwest
+      • westeurope       • francecentral
+      • germanywestcentral
+
+definition:
+  # evaluate on every azurerm_* resource that has a location attr
+  cond_type: attribute
+  resource_types:
+    - "/^azurerm_.+/"            # regex, catches all AzureRM resource blocks
+
+  # look in .tf files  OR  in plan JSON (change.after.location)
+  attribute: "location | change.after.location"
+  operator: regex_match
+  value: '^(uksouth|ukwest|westeurope|francecentral|germanywestcentral|global)$'

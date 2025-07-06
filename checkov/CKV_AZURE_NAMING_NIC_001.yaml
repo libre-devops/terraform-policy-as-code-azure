@@ -1,0 +1,14 @@
+# checkov/CKV_AZURE_NAMING_NIC_001.yaml
+metadata:
+  id: CKV_AZURE_NAMING_NIC_001
+  name: "NIC names must start with 'nic-'"
+  category: "NAMING_CONVENTION"
+  severity: "LOW"
+
+definition:
+  cond_type: attribute
+  resource_types:
+    - azurerm_network_interface
+  attribute: "name | change.after.name"
+  operator: regex_match
+  value: '^nic-[A-Za-z0-9-]+$'
